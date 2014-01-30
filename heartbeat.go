@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/gob"
 	"flag"
+	"html/template"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -17,9 +19,11 @@ type Node struct {
 }
 
 var (
-	m          sync.Mutex
+	m          sync.RWMutex
 	live_hosts map[string]Node
 )
+
+var templates = template.Must(template.ParseFiles("list.html"));
 
 func connection_handler(conn net.Conn) {
 	dec := gob.NewDecoder(conn)
@@ -34,7 +38,7 @@ func connection_handler(conn net.Conn) {
 
 func map_check(sleepTime time.Duration) {
 	for {
-		m.Lock()
+		m.RLock()
 		for key, value := range live_hosts {
 			log.Printf("Address: %s, Hostname: %s, Beacon Time: %q\n", key, value.Hostname, value.Timestamp)
 			if time.Since(value.Timestamp) > sleepTime*3 {
@@ -42,13 +46,13 @@ func map_check(sleepTime time.Duration) {
 				delete(live_hosts, key)
 			}
 		}
-		m.Unlock()
+		m.RUnlock()
 		time.Sleep(sleepTime)
 	}
 }
 
 func server(port string) {
-    ln, err := net.Listen("tcp", ":"+port)
+	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatalln("Could not start server: %s", err)
 	}
@@ -60,6 +64,13 @@ func server(port string) {
 		}
 		go connection_handler(conn)
 	}
+}
+
+func root_handler(w http.ResponseWriter, r *http.Request) {
+    err := templates.ExecuteTemplate(w, "list.html", live_hosts)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
 }
 
 func client(ip, port string, sleepTime time.Duration) {
@@ -88,7 +99,9 @@ func main() {
 	if *ip == "" {
 		live_hosts = make(map[string]Node)
 		go map_check(*sleepTime)
-		server(*port)
+		go server(*port)
+		http.HandleFunc("/", root_handler)
+		http.ListenAndServe(":8080", nil)
 	} else {
 		client(*ip, *port, *sleepTime)
 	}
