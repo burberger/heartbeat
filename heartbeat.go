@@ -111,12 +111,13 @@ func main() {
 	port := flag.String("port", "5656", "Specify the port server is running on.")
 	flag.Parse()
 
-    // No client flag, serve stuff
+    // No client flag, serve heartbeat listener and web interface
 	if *ip == "" {
 		live_hosts = make(map[string]Node)
 		go map_check(*sleepTime)
 		go server(*port)
 		http.HandleFunc("/", root_handler)
+        http.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("public/"))))
 		http.ListenAndServe(":8080", nil)
 	} else {
 		client(*ip, *port, *sleepTime)
