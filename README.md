@@ -5,7 +5,7 @@ Simple client server heartbeat program written in go.
 
 Usage:
 
-  heartbeat -t <time> -client <servername> -p <port>
+  heartbeat -t time -client servername -p port
 
 * Time is specified with units.  10s, 5m, 3h, 4d, etc.  Default 10m.
 * Client flag places daemon in client mode.  Must be supplied with server address.  Default server mode.
